@@ -38,7 +38,7 @@ DISTCLEAN_TARGETS =
 
 CPPFLAGS += -Iinclude -std=c++11 -Wall
 
-all: real-all 
+all: real-all
 
 include src/main.mk
 include boardtest/boardTest.mk
