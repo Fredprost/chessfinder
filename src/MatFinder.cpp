@@ -51,7 +51,7 @@ int MatFinder::runFinderOnCurrentPosition()
 
     sendCurrentPositionToEngine();
     lines_.assign(Options::getMaxLines(), Line::emptyLine);
-    sendToEngine("go movetime "
+    sendToEngine("go depth "
             + to_string(Options::getPlayforMovetime()));
     waitBestmove();
     Utils::output("Evaluation is :\n");
@@ -95,19 +95,19 @@ int MatFinder::runFinderOnCurrentPosition()
 
         //Scaling moveTime
         //According to number of lines
-        moveTime = (int)(moveTime * ((float)
-                    ((float)pv/(float)Options::getMaxLines())
-                    ));
-        if (moveTime <= 600)
-            moveTime = 600;
+        //moveTime = (int)(moveTime * ((float)
+        //            ((float)pv/(float)Options::getMaxLines())
+        //            ));
+        //if (moveTime <= 600)
+        //    moveTime = 600;
         //Acccording to depth
-        moveTime += 10 * addedMoves_;
+        //moveTime += 10 * addedMoves_;
 
         //Initialize vector with empty lines
         lines_.assign(Options::getMaxLines(), Line::emptyLine);
 
         //Increase movetime with depth
-        sendToEngine("go movetime " + to_string(moveTime));
+        sendToEngine("go depth " + to_string(moveTime));
 
         Utils::output("[" + Board::to_string(active)
                 + "] Thinking... (" + to_string(moveTime) + ")\n", 1);
