@@ -1,7 +1,7 @@
 /*
  * Matfinder, a program to help chess engines to find mat
  *
- * Copyright© 2013 Philippe Virouleau
+ * CopyrightÂ© 2013 Philippe Virouleau
  *
  * You can contact me at firstname.lastname@imag.fr
  * (Replace "firstname" and "lastname" with my actual names)
@@ -899,4 +899,365 @@ const string Chessboard::ALAMOS_STARTPOS =
                 "8/1rnqknr1/1pppppp1/8/8/1PPPPPP1/1RNQKNR1/8 w - - 0 1";
 const string Chessboard::GARDNER_STARTPOS =
                 "8/8/1rnbqk2/1ppppp2/8/1PPPPP2/1RNBQK2/8 w - - 0 1";
+
+
+
+// BM0 best moves alternative order: promotion,take, move pawn, square to close to SQA1 (or SQD4), square from if far from SQA1 (or SQD4) piece to move =K,N,B,R,Q interùediate version
+/*
+        uint16_t evaluatemove(UCIMove &mv)
+    {
+        File f;
+        Rank r;
+        uint16_t encodedMove = 0x0;
+                
+        if (mv.size() != 4 && mv.size() != 5)
+            Utils::handleError("Error parsing uci move");
+                string to = mv.substr(0, 2);
+        Board::squareFromString(to, &f, &r);
+                Square sqtmp= Board::Square(f,r);
+                
+                if (mv.size() == 5) {
+            Piece::Kind promote = promotionFromChar(mv[4]);
+            switch (promote) {
+                case Piece::KNIGHT:
+                    encodedMove |= 0x1;
+                    break;
+                case Piece::BISHOP:
+                    encodedMove |= 0x2;
+                    break;
+                case Piece::ROOK:
+                    encodedMove |= 0x3;
+                    break;
+                case Piece::QUEEN:
+                    encodedMove |= 0x4;
+                    break;
+                default:
+                    break;
+            }
+            encodedMove <<= 3;
+        }
+                //TODO if square to is not empty switchsur le contenu
+                else
+                { if (sqtmp.getPiece() != NULL) encodedMove |= 0x5;
+                 encodedMove <<= 3;
+
+                }
+
+                
+        //Rank in 1..8, go to 0..7
+        encodedMove |= (uint16_t) (r - 1);
+        encodedMove <<= 3;
+        //File already on 0..7
+        encodedMove |= (uint16_t) (f-1);
+        encodedMove <<= 3;
+                
+        string from = mv.substr(2, 2);
+        Board::squareFromString(from, &f, &r);
+        //Rank in 1..8, go to 0..7
+        encodedMove |= (uint16_t) (8-r);
+        encodedMove <<= 3;
+        //File already on 0..7
+        encodedMove |= (uint16_t) (8-f);
+        //encodedMove <<= 3;
+        Utils::output("Move " + mv + " is " + std::to_string(encodedMove)
+                                          + ", decimal\n", 3);
+        
+        return encodedMove;
+    }
+ */ 
+       
+// VERSION CENTRE        
+// Fonction F3
+/*
+uint16_t Chessboard::evaluatemove(UCIMove &mv)
+    {
+        File ff,ft;
+        Rank rf,rt;
+        uint16_t encodedMove = 0x0;
+                
+        if (mv.size() != 4 && mv.size() != 5)
+            Utils::handleError("Error parsing uci move");
+                
+                
+        string to = mv.substr(0, 2);
+        string from = mv.substr(2,2);
+        
+        Board::squareFromString(to, &ff, &rf);
+        Board::squareFromString(from, &ft, &rt);
+        Square *sqtmp_to= board_[ft][rt];
+        Square *sqtmp_from= board_[ff][rf];
+                
+        // Prise prioritaire         
+        if (sqtmp_to->getPiece() != NULL)
+                {encodedMove |=0x5;
+            encodedMove <<= 3;
+                }
+                
+        // Choix des piËces dans l'ordre de la plus 
+                //   plus grande
+       
+                if (sqtmp_from->getPiece() != NULL)
+                {
+                Piece::Kind movedpiece = (sqtmp_from->getPiece())->getKind();
+        switch (movedpiece) {
+                case Piece::PAWN:
+                                encodedMove |= 0x1;
+                        case Piece::KNIGHT:
+                                encodedMove |= 0x2;
+                                break;
+                        case Piece::BISHOP:
+                                encodedMove |= 0x3;
+                                break;
+                        case Piece::ROOK:
+                                encodedMove |= 0x4;
+                                break;
+                        case Piece::QUEEN:
+                                encodedMove |= 0x5;
+                                break;
+                        case Piece::KING:
+                                encodedMove |= 0x6; 
+                                break;
+                        default:
+                                break;
+                }
+                encodedMove <<= 3;
+                }
+                
+                
+        // Centralisation des piËces
+        encodedMove |= (7-abs(ft-4));
+        encodedMove <<= 3; 
+                
+        encodedMove |= (7-abs((uint16_t) rt-4));
+                encodedMove <<=3;
+                
+        return encodedMove;
+    }
+*/
+       
+        
+        //VERSION 2 : UNDO utilisation de variables statiques pour se rappeler du coup prÈcÈdent
+        //On met une grosse prioritÈ si un coup "dÈfait" celui qui Ètait fait avant. 
+        
+
+// FONCTION F2
+/*
+uint16_t Chessboard::evaluatemove(UCIMove &mv)
+    {
+        static File old_file_from=A,old_file_to=A;
+        static Rank old_rank_from=0,old_rank_to=0; 
+                
+        File ff,ft;
+        Rank rf,rt;
+        uint16_t encodedMove = 0x0;
+                
+        if (mv.size() != 4 && mv.size() != 5)
+            Utils::handleError("Error parsing uci move");
+                
+                
+        string to = mv.substr(0, 2);
+        string from = mv.substr(2,2);
+        
+        Board::squareFromString(to, &ff, &rf);
+        Board::squareFromString(from, &ft, &rt);
+        Square *sqtmp_to= board_[ft][rt];
+        Square *sqtmp_from= board_[ft][rt];
+
+        //priorité sur les promotions et sur les prises
+        if (mv.size()==5)
+           {
+	     encodedMove |=0x3;
+	     encodedMove <<= 3;
+	   }
+	else 
+	  {
+	    if (sqtmp_to->getPiece() != NULL)
+	      {
+		encodedMove |=0x2;
+		encodedMove <<= 3;
+	      }
+	    else if (sqtmp_from->getPiece() != NULL && 
+                                 (sqtmp_from->getPiece())->getKind() == Piece::PAWN)
+	      {
+		encodedMove |=0x1;
+		encodedMove <<= 3;
+	      }
+	  }
+
+
+                
+        //PrioritÈ sur un coup qui dÈfait un ancien coup 
+        if (old_file_to ==  ff && old_rank_to == rf)
+        {
+                        if (old_file_from == ft && old_rank_from == rt)
+                        {
+                                encodedMove |= 0x7;
+                                encodedMove <<= 3;
+                        }
+                        encodedMove |= 0x7;
+                        encodedMove <<= 3;
+                }
+                
+                // sinon on ajoute une prioritÈ ‡ tout coup "dÈfaisable" donc ni un coup de pion
+                // ni une prise.
+                
+        if (sqtmp_to->getPiece() ==  NULL || 
+                        !(sqtmp_from->getPiece()->getKind()== Piece::PAWN))
+                {encodedMove |=0x5;
+            encodedMove <<= 3;
+                }
+                
+        old_file_from = ff;
+        old_file_to = ft;
+        old_rank_from = rf;
+        old_rank_to = rt;
+
+
+                
+        return encodedMove;
+    }
+       
+*/
+
+
+        //VERSION 3 MAP (blanc) K ->B2 Q-> C3 R-> B3  B->D2 N-> C2 // A rajouter chercher us/them         
+        // 3 bits 3 promsinon si  capture 2 sinon si  pion bouge 1
+        // 6 bits distance en ligne et en colonne au cases destination
+        // 3 bits bonus type piece a bouger
+
+/* FONCTION F1  */      
+uint16_t Chessboard::evaluatemove(UCIMove &mv)
+    {
+        File ff,ft;
+        Rank rf,rt;
+        uint16_t encodedMove = 0x0;
+                
+        if (mv.size() != 4 && mv.size() != 5)
+            Utils::handleError("Error parsing uci move");
+                
+                
+        string to = mv.substr(0, 2);
+        string from = mv.substr(2,2);
+        
+        Board::squareFromString(to, &ff, &rf);
+        Board::squareFromString(from, &ft, &rt);
+
+        Square *sqtmp_to= board_[ft][rt];
+        Square *sqtmp_from= board_[ff][rf];
+                
+        // promotion/Prise/ pion prioritaire
+                if (mv.size()==5)
+                        {
+                        encodedMove |=0x3;
+            encodedMove <<= 3;
+                        }
+                else {
+                        if (sqtmp_to->getPiece() != NULL)
+                        {
+                                encodedMove |=0x2;
+                                encodedMove <<= 3;
+                        }
+                        else if (sqtmp_from->getPiece() != NULL && 
+                                 (sqtmp_from->getPiece())->getKind() == Piece::PAWN)
+                        {
+                                encodedMove |=0x1;
+                                encodedMove <<= 3;
+                        }
+                        }
+        // Choix des destination/  piËces dans l'ordre de la plus 
+                //   plus grande
+                
+                if (sqtmp_from->getPiece() != NULL)
+                {
+                        Piece::Kind movedpiece = (sqtmp_from->getPiece())->getKind();
+                        switch (movedpiece) {
+                                case Piece::KNIGHT:
+                                {
+                                        encodedMove |= 7-abs(ft-2);
+                                        encodedMove <<= 3;                                         
+                                        encodedMove |= 7-abs((uint16_t) rt - 4);
+                                        encodedMove <<=3;                                        
+                                        break;
+                                }
+                                case Piece::BISHOP:
+                                {        
+                                        encodedMove |= 7-abs(ft-3);
+                                        encodedMove <<= 3;                                         
+                                        encodedMove |= 7-abs((uint16_t) rt-6);
+                                        encodedMove <<=3;                                        
+                                        break;
+                                }
+                                case Piece::ROOK:
+                                {
+                                        encodedMove |= 7-abs(ft-2);
+                                        encodedMove <<= 3;                                         
+                                        encodedMove |= 7-abs((uint16_t) rt-5);
+                                        encodedMove <<=3;                                        
+                                        break;
+                                }
+                                case Piece::QUEEN:
+                                {
+                                        encodedMove |= 7-abs(ft-3);
+                                        encodedMove <<= 3;                                         
+                                        encodedMove |= 7-abs((uint16_t) rt-5);
+                                        encodedMove <<=3;                                        
+                                        break;
+                                }
+                                case Piece::KING:
+                                {
+                                        encodedMove |= 7-abs(ft-2);
+                                        encodedMove <<= 3;                                         
+                                        encodedMove |= 7-abs((uint16_t) rt-6);
+                                        encodedMove <<=3;                                        
+                                        break;
+                                }
+                                default:
+                                {
+                                        break;
+                                encodedMove <<= 3;
+                                        encodedMove <<= 3;
+                        
+                                }
+                        }                                                                
+                }
+                if (sqtmp_from->getPiece() != NULL)
+                {
+                        Piece::Kind movedpiece = (sqtmp_from->getPiece())->getKind();
+                        switch (movedpiece) {
+                                case Piece::PAWN:
+                                        encodedMove |= 0x1;
+                                case Piece::KNIGHT:
+                                        encodedMove |= 0x2;
+                                        break;
+                                case Piece::BISHOP:
+                                        encodedMove |= 0x3;
+                                        break;
+                                case Piece::ROOK:
+                                        encodedMove |= 0x4;
+                                        break;
+                                case Piece::QUEEN:
+                                        encodedMove |= 0x5;
+                                        break;
+                                case Piece::KING:
+                                        encodedMove |= 0x6; 
+                                        break;
+                                default:
+                                        break;
+                        }
+//                        encodedMove <<= 3;
+                }
+                
+        // Bonus type
+                      
+        return encodedMove;
+    }
+
+
+
+
+
+
+
+
+
 
