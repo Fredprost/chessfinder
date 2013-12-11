@@ -86,9 +86,12 @@ int OracleFinder::runFinderOnCurrentPosition()
 
     sendCurrentPositionToEngine();
     lines_.assign(maxMoves, Line::emptyLine);
-    sendToEngine("go movetime "
-            + to_string(Options::getPlayforMovetime()));
-    waitBestmove();
+
+        sendToEngine("go movetime "
+          + to_string(Options::getPlayforMovetime()));
+
+  
+  waitBestmove();
     Utils::output("Evaluation is :\n");
     Utils::output(getPrettyLines());
     lines_.clear();
@@ -131,7 +134,7 @@ int OracleFinder::runFinderOnCurrentPosition()
 
 
         Utils::output("[" + Board::to_string(active)
-                + "] Proceed size : " + to_string(toProceed_.size()) + "\n");
+		      + "] Proceed size : " + to_string(toProceed_.size()) + "\n",2);
 
         sendCurrentPositionToEngine();
 
@@ -144,7 +147,12 @@ int OracleFinder::runFinderOnCurrentPosition()
         //Initialize vector with empty lines
         lines_.assign(maxMoves, Line::emptyLine);
 
-        sendToEngine("go movetime " + to_string(moveTime));
+
+        //sendToEngine("go movetime " + to_string(moveTime));
+       // pour le depth fixé XXXXXXXXXXX
+
+        sendToEngine("go depth " + to_string(moveTime));
+
 
         Utils::output("[" + Board::to_string(active)
                 + "] Thinking... (" + to_string(moveTime) + ")\n", 1);
@@ -187,6 +195,8 @@ int OracleFinder::runFinderOnCurrentPosition()
 
         //Then proceed the balanced lines according to the side the engine
         //play for.
+		//Utils::output("test Mehdi: ", 3);
+
         if (engine_play_for_ == active) {
             //check if one in hashtable, if not push the first
             //balanced line to proceed
@@ -194,6 +204,10 @@ int OracleFinder::runFinderOnCurrentPosition()
             Line *l = NULL;
             Board::UCIMove mv;
             SimplePos sp;
+			Board::UCIMove bestmove=balancedLines[0]->firstMove(),localmove;
+			uint16_t local,best;
+			int index=0;
+			best=  Board::evaluatemove(bestmove);
             //Sort the balanced line so that we take the shortest
             //Here balancedLines shouldn't be empty, if so it's a bug
             //(Go reverse to have the bestLine at last)
@@ -209,30 +223,29 @@ int OracleFinder::runFinderOnCurrentPosition()
                 //Jean Louis' idea to force finding positions in oracle
 #if 1
                 next = oracleTable_->findPos(sp);
+				localmove=balancedLines[i]->firstMove();
+				local =  Board::evaluatemove(localmove);
+
+				if (local>best)
+				{
+					index=i;
+					best=local;
+				}
                 if (next)
                     break;
 #endif
             }
             //TODO: what if positive eval ?
             if (!next) {
-#if 0
-                //Retrieve best line or shortest line
-                std::sort(balancedLines.begin(), balancedLines.end(),
-                        Line::compareLineLength);
-                if (balancedLines[0]->getMoves().size() 
-                        < l->getMoves().size()) {
-                    //Find a shortest line if the "best" line
-                    //is not one of the shortest
-                    l = balancedLines[0];
-                    //l is not null (or bug)
-                    mv = l->firstMove();
+		
+	          l = balancedLines[index];
+					mv = l->firstMove();
                     cb_->uciApplyMove(mv);
-                    //This is the next pose
-                    //TODO: do not remove clock ?
+
                     sp = cb_->exportToFEN(true);
                     cb_->undoMove();
-                }
-#endif
+			
+    			
                 //no next position in the table, push the node to stack
                 next = new Node();
                 next->pos = sp;
@@ -248,7 +261,7 @@ int OracleFinder::runFinderOnCurrentPosition()
                 //Breads first
                 toProceed_.push_back(next);
 #endif
-            }
+            
                 /*
                  *Utils::output("[" + Board::to_string(active)
                  *        + "] Found a line in table !\n", 2);
@@ -256,7 +269,7 @@ int OracleFinder::runFinderOnCurrentPosition()
             //Whatever the move goes, add it to our move list
             MoveNode move(mv, next);
             current->legal_moves.push_back(move);
-
+		}
         } else {
             //get all draw lines and push them
 
