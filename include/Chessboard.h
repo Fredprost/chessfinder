@@ -43,6 +43,8 @@ public:
     void undoMove();
     //Play the moves, backtrack them, then return
     //corresponding prettyMovesHistory
+    uint16_t evaluatemove(UCIMove &mv);
+
     const string tryUciMoves(const list<string> &moves, int limit = -1);
 
     const Side getActiveSide();
@@ -60,6 +62,7 @@ public:
     static const string CHESS_STARTPOS;
     static const string ALAMOS_STARTPOS;
     static const string GARDNER_STARTPOS;
+ 
 private:
     Chessboard();
 
